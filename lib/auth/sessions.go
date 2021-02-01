@@ -22,7 +22,6 @@ import (
 
 	"github.com/gravitational/teleport"
 	"github.com/gravitational/teleport/api/types"
-	"github.com/gravitational/teleport/api/types/wrappers"
 	"github.com/gravitational/teleport/lib/backend"
 	"github.com/gravitational/teleport/lib/jwt"
 	"github.com/gravitational/teleport/lib/modules"
@@ -55,6 +54,16 @@ func (s *Server) CreateAppSession(ctx context.Context, req services.CreateAppSes
 	// that will be used to establish the connection.
 	ttl := checker.AdjustSessionTTL(identity.Expires.Sub(s.clock.Now()))
 
+	certificate, err := tlsca.ParseCertificatePEM(parentSession.GetTLSCert())
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	parentIdent, err := tlsca.FromSubject(certificate.Subject, certificate.NotAfter)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	log.Debugf("+_+_+_+_+ IDENTITY %#v", parentIdent)
+
 	// Create certificate for this session.
 	privateKey, publicKey, err := s.GetNewKeyPairFromPool()
 	if err != nil {
@@ -65,12 +74,13 @@ func (s *Server) CreateAppSession(ctx context.Context, req services.CreateAppSes
 		publicKey: publicKey,
 		checker:   checker,
 		ttl:       ttl,
-		// Set the login to be a random string. Application certificates are never
-		// used to log into servers but SSH certificate generation code requires a
-		// principal be in the certificate.
-		traits: wrappers.Traits(map[string][]string{
-			teleport.TraitLogins: {uuid.New()},
-		}),
+		traits:    parentIdent.Traits,
+		// // Set the login to be a random string. Application certificates are never
+		// // used to log into servers but SSH certificate generation code requires a
+		// // principal be in the certificate.
+		// traits: wrappers.Traits(map[string][]string{
+		// 	teleport.TraitLogins: []string{uuid.New()},
+		// }),
 		// Only allow this certificate to be used for applications.
 		usage: []string{teleport.UsageAppsOnly},
 		// Add in the application routing information.
