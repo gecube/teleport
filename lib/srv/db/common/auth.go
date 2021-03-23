@@ -30,8 +30,10 @@ import (
 	"github.com/gravitational/teleport/lib/tlsca"
 	"github.com/gravitational/teleport/lib/utils"
 
-	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws"
+	awssession "github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/rds/rdsutils"
+	"github.com/aws/aws-sdk-go/service/redshift"
 
 	gcpcredentials "cloud.google.com/go/iam/credentials/apiv1"
 	gcpcredentialspb "google.golang.org/genproto/googleapis/iam/credentials/v1"
@@ -45,14 +47,12 @@ import (
 type AuthConfig struct {
 	// AuthClient is the cluster auth client.
 	AuthClient *auth.Client
-	// AWSCredentials are the AWS credentials used to generate RDS auth tokens.
-	// May be empty when not proxying any RDS databases.
-	AWSCredentials *credentials.Credentials
+	// AWSSession is the AWS session for the server's region which is used
+	// to generate RDS/Aurora/Redshift auth tokens. May be empty.
+	AWSSession *awssession.Session
 	// GCPIAM is the GCP IAM client used to generate GCP auth tokens.
 	// May be empty when not proxying any Cloud SQL databases.
 	GCPIAM *gcpcredentials.IamCredentialsClient
-	// RDSCACerts contains AWS RDS root certificates.
-	RDSCACerts map[string][]byte
 	// Clock is the clock implementation.
 	Clock clockwork.Clock
 	// Log is used for logging.
@@ -92,15 +92,39 @@ func NewAuth(config AuthConfig) (*Auth, error) {
 // GetRDSAuthToken returns authorization token that will be used as a password
 // when connecting to RDS and Aurora databases.
 func (a *Auth) GetRDSAuthToken(sessionCtx *Session) (string, error) {
-	if a.cfg.AWSCredentials == nil {
-		return "", trace.BadParameter("AWS IAM client is not initialized")
+	if a.cfg.AWSSession == nil {
+		return "", trace.BadParameter("AWS session for %s is not initialized", sessionCtx)
 	}
 	a.cfg.Log.Debugf("Generating RDS auth token for %s.", sessionCtx)
 	return rdsutils.BuildAuthToken(
 		sessionCtx.Server.GetURI(),
 		sessionCtx.Server.GetAWS().Region,
 		sessionCtx.DatabaseUser,
-		a.cfg.AWSCredentials)
+		a.cfg.AWSSession.Config.Credentials)
+}
+
+// GetRedshiftAuthToken returns authorization token that will be used as a
+// password when connecting to Redshift databases.
+func (a *Auth) GetRedshiftAuthToken(sessionCtx *Session) (string, string, error) {
+	if a.cfg.AWSSession == nil {
+		return "", "", trace.BadParameter("AWS session for %s is not initialized", sessionCtx)
+	}
+	a.cfg.Log.Debugf("Generating Redshift auth token for %s.", sessionCtx)
+	resp, err := redshift.New(a.cfg.AWSSession).GetClusterCredentials(&redshift.GetClusterCredentialsInput{
+		ClusterIdentifier: aws.String(sessionCtx.Server.GetAWS().Redshift.ClusterID),
+		DbUser:            aws.String(sessionCtx.DatabaseUser),
+		DbName:            aws.String(sessionCtx.DatabaseName),
+		// TODO(r0mant): Do not auto-create database account if DbUser doesn't
+		// exist for now, but it may be potentially useful in future.
+		AutoCreate: aws.Bool(false),
+		// TODO(r0mant): List of additional groups DbUser will join for the
+		// session. Do we need to let people control this?
+		DbGroups: []*string{},
+	})
+	if err != nil {
+		return "", "", trace.Wrap(err)
+	}
+	return *resp.DbUser, *resp.DbPassword, nil
 }
 
 // GetCloudSQLAuthToken returns authorization token that will be used as a
@@ -154,14 +178,6 @@ func (a *Auth) GetTLSConfig(ctx context.Context, sessionCtx *Session) (*tls.Conf
 		if !tlsConfig.RootCAs.AppendCertsFromPEM(sessionCtx.Server.GetCA()) {
 			return nil, trace.BadParameter("invalid server CA certificate")
 		}
-	} else if sessionCtx.Server.IsRDS() {
-		if rdsCA, ok := a.cfg.RDSCACerts[sessionCtx.Server.GetAWS().Region]; ok {
-			if !tlsConfig.RootCAs.AppendCertsFromPEM(rdsCA) {
-				return nil, trace.BadParameter("invalid RDS CA certificate")
-			}
-		} else {
-			a.cfg.Log.Warnf("No RDS CA certificate for %v.", sessionCtx.Server)
-		}
 	}
 	// You connect to Cloud SQL instances by IP and the certificate presented
 	// by the instance does not contain IP SANs so the default "full" certificate
@@ -191,9 +207,9 @@ func (a *Auth) GetTLSConfig(ctx context.Context, sessionCtx *Session) (*tls.Conf
 		// This will verify CN and cert chain on each connection.
 		tlsConfig.VerifyConnection = getVerifyCloudSQLCertificate(tlsConfig.RootCAs)
 	}
-	// RDS/Aurora and Cloud SQL auth is done with an auth token so don't
-	// generate a client certificate and exit here.
-	if sessionCtx.Server.IsRDS() || sessionCtx.Server.IsCloudSQL() {
+	// RDS/Aurora/Redshift and Cloud SQL auth is done with an auth token so
+	// don't generate a client certificate and exit here.
+	if sessionCtx.Server.IsRDS() || sessionCtx.Server.IsRedshift() || sessionCtx.Server.IsCloudSQL() {
 		return tlsConfig, nil
 	}
 	// Otherwise, when connecting to an onprem database, generate a client
