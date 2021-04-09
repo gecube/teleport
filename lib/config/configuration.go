@@ -686,6 +686,25 @@ func applyProxyConfig(fc *FileConfig, cfg *service.Config) error {
 		}
 		cfg.Proxy.TunnelPublicAddrs = addrs
 	}
+	if len(fc.Proxy.PostgresPublicAddr) != 0 {
+		// Postgres proxy is multiplexed on the web proxy port.
+		addrs, err := utils.AddrsFromStrings(fc.Proxy.PostgresPublicAddr, defaults.HTTPListenPort)
+		if err != nil {
+			return trace.Wrap(err)
+		}
+		cfg.Proxy.PostgresPublicAddrs = addrs
+	}
+	if len(fc.Proxy.MySQLPublicAddr) != 0 {
+		if fc.Proxy.MySQLAddr == "" {
+			return trace.BadParameter("mysql_listen_addr must be set when mysql_public_addr is set")
+		}
+		// MySQL proxy is listening on a separate port.
+		addrs, err := utils.AddrsFromStrings(fc.Proxy.MySQLPublicAddr, defaults.MySQLListenPort)
+		if err != nil {
+			return trace.Wrap(err)
+		}
+		cfg.Proxy.MySQLPublicAddrs = addrs
+	}
 
 	acme, err := fc.Proxy.ACME.Parse()
 	if err != nil {

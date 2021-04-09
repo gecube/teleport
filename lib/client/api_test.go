@@ -20,6 +20,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/gravitational/teleport/api/client"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/utils"
 
@@ -310,5 +311,64 @@ func TestWebProxyHostPort(t *testing.T) {
 			require.Equal(t, tt.wantHost, gotHost)
 			require.Equal(t, tt.wantPort, gotPort)
 		})
+	}
+}
+
+// TestApplyProxySettings validates that settings received from the proxy's
+// ping endpoint are correctly applied to Teleport client.
+func TestApplyProxySettings(t *testing.T) {
+	tests := []struct {
+		settingsIn  client.ProxySettings
+		tcConfigIn  Config
+		tcConfigOut Config
+	}{
+		{
+			settingsIn: client.ProxySettings{},
+			tcConfigIn: Config{
+				WebProxyAddr: "web.example.com:443",
+			},
+			tcConfigOut: Config{
+				WebProxyAddr:      "web.example.com:443",
+				PostgresProxyAddr: "web.example.com:443",
+			},
+		},
+		{
+			settingsIn: client.ProxySettings{
+				DB: client.DBProxySettings{
+					MySQLListenAddr: "0.0.0.0:3036",
+				},
+			},
+			tcConfigIn: Config{
+				WebProxyAddr: "web.example.com:443",
+			},
+			tcConfigOut: Config{
+				WebProxyAddr:      "web.example.com:443",
+				PostgresProxyAddr: "web.example.com:443",
+				MySQLProxyAddr:    "web.example.com:3036",
+			},
+		},
+		{
+			settingsIn: client.ProxySettings{
+				DB: client.DBProxySettings{
+					PostgresPublicAddr: "postgres.example.com:5432",
+					MySQLListenAddr:    "0.0.0.0:3036",
+					MySQLPublicAddr:    "mysql.example.com:3306",
+				},
+			},
+			tcConfigIn: Config{
+				WebProxyAddr: "web.example.com:443",
+			},
+			tcConfigOut: Config{
+				WebProxyAddr:      "web.example.com:443",
+				PostgresProxyAddr: "postgres.example.com:5432",
+				MySQLProxyAddr:    "mysql.example.com:3306",
+			},
+		},
+	}
+	for _, test := range tests {
+		tc := &TeleportClient{Config: test.tcConfigIn}
+		err := tc.applyProxySettings(test.settingsIn)
+		require.NoError(t, err)
+		require.EqualValues(t, test.tcConfigOut, tc.Config)
 	}
 }

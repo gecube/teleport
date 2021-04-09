@@ -514,6 +514,11 @@ func TestApplyConfig(t *testing.T) {
 	require.True(t, cfg.Proxy.Enabled)
 	require.Equal(t, "tcp://webhost:3080", cfg.Proxy.WebAddr.FullAddress())
 	require.Equal(t, "tcp://tunnelhost:1001", cfg.Proxy.ReverseTunnelListenAddr.FullAddress())
+	require.Equal(t, "tcp://webhost:3336", cfg.Proxy.MySQLAddr.FullAddress())
+	require.Len(t, cfg.Proxy.PostgresPublicAddrs, 1)
+	require.Equal(t, "tcp://postgres.example:5432", cfg.Proxy.PostgresPublicAddrs[0].FullAddress())
+	require.Len(t, cfg.Proxy.MySQLPublicAddrs, 1)
+	require.Equal(t, "tcp://mysql.example:3306", cfg.Proxy.MySQLPublicAddrs[0].FullAddress())
 
 	u2fCAFromFile, err := ioutil.ReadFile("testdata/u2f_attestation_ca.pem")
 	require.NoError(t, err)
@@ -576,6 +581,8 @@ func TestApplyConfigNoneEnabled(t *testing.T) {
 	require.Len(t, cfg.SSH.PublicAddrs, 0)
 	require.False(t, cfg.Apps.Enabled)
 	require.False(t, cfg.Databases.Enabled)
+	require.Len(t, cfg.Proxy.PostgresPublicAddrs, 0)
+	require.Len(t, cfg.Proxy.MySQLPublicAddrs, 0)
 }
 
 func TestBackendDefaults(t *testing.T) {
