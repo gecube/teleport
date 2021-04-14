@@ -30,6 +30,7 @@ import (
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/sshutils"
 	"github.com/gravitational/teleport/lib/utils"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/gravitational/trace"
 
@@ -150,6 +151,19 @@ func (h *AuthHandlers) CheckPortForward(addr string, ctx *ServerContext) error {
 	return nil
 }
 
+var (
+	failedLoginCount = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: teleport.MetricFailedLoginAttempts,
+			Help: "Number of times there was a failed login",
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(failedLoginCount)
+}
+
 // UserKeyAuth implements SSH client authentication using public keys and is
 // called by the server every time the client connects.
 func (h *AuthHandlers) UserKeyAuth(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
@@ -204,6 +218,7 @@ func (h *AuthHandlers) UserKeyAuth(conn ssh.ConnMetadata, key ssh.PublicKey) (*s
 		}); err != nil {
 			h.WithError(err).Warn("Failed to emit failed login audit event.")
 		}
+		failedLoginCount.Inc()
 	}
 
 	// Check that the user certificate uses supported public key algorithms, was

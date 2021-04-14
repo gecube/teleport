@@ -28,6 +28,7 @@ import (
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/services/local"
 	"github.com/gravitational/teleport/lib/utils"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/gravitational/trace"
 	"github.com/jonboulle/clockwork"
@@ -1014,10 +1015,26 @@ func (c *Cache) GetClusterConfig(opts ...services.MarshalOption) (services.Clust
 	return rg.clusterConfig.GetClusterConfig(services.AddOptions(opts, services.SkipValidation())...)
 }
 
+var (
+	clusterNameNotFound = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: teleport.MetricClusterNameNotFound,
+			Help: "Number of times a cluster name was not found",
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(clusterNameNotFound)
+}
+
 // GetClusterName gets the name of the cluster from the backend.
 func (c *Cache) GetClusterName(opts ...services.MarshalOption) (services.ClusterName, error) {
 	rg, err := c.read()
 	if err != nil {
+		if trace.IsNotFound(err) {
+			clusterNameNotFound.Inc()
+		}
 		return nil, trace.Wrap(err)
 	}
 	defer rg.Release()

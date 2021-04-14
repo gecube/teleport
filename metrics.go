@@ -43,6 +43,21 @@ const (
 	// MetricTrustedClusters counts trusted clusters
 	MetricTrustedClusters = "trusted_clusters"
 
+	// MetricClusterNameNotFound counts times a cluster name was not found
+	MetricClusterNameNotFound = "cluster_name_not_found_total"
+
+	// MetricFailedLoginAttempts counts failed login attempts
+	MetricFailedLoginAttempts = "failed_login_attempts_total"
+
+	// MetricFailedConnectToNodeAttempts counts failed ssh attempts
+	MetricFailedConnectToNodeAttempts = "failed_connect_to_node_attempts_total"
+
+	// MetricUserMaxConcurrentSessionsHit counts number of times the user exceeded their max concurrent ssh connections
+	MetricUserMaxConcurrentSessionsHit = "user_max_concurrent_sessions_hit_total"
+
+	// MetricProxyConnectionLimitHitCount counts the number of times proxy connection limit was exceeded
+	MetricProxyConnectionLimitHitCount = "proxy_connection_limit_exceeded_total"
+
 	// TagCluster is a metric tag for a cluster
 	TagCluster = "cluster"
 )

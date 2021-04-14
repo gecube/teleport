@@ -34,6 +34,7 @@ import (
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/limiter"
 	"github.com/gravitational/teleport/lib/utils"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/gravitational/trace"
 
@@ -391,6 +392,19 @@ func (s *Server) trackConnections(delta int32) int32 {
 	return atomic.AddInt32(&s.conns, delta)
 }
 
+var (
+	proxyConnectionLimitHitCount = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: teleport.MetricProxyConnectionLimitHitCount,
+			Help: "Number of times proxy connection limit was exceeded",
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(proxyConnectionLimitHitCount)
+}
+
 // HandleConnection is called every time an SSH server accepts a new
 // connection from a client.
 //
@@ -407,6 +421,9 @@ func (s *Server) HandleConnection(conn net.Conn) {
 		log.Errorf(err.Error())
 	}
 	if err := s.limiter.AcquireConnection(remoteAddr); err != nil {
+		if trace.IsLimitExceeded(err) {
+			proxyConnectionLimitHitCount.Inc()
+		}
 		log.Errorf(err.Error())
 		conn.Close()
 		return
