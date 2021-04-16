@@ -24,7 +24,7 @@ import (
 	"fmt"
 
 	"github.com/gravitational/teleport/api/client/proto"
-	"github.com/gravitational/teleport/lib/auth"
+	libauth "github.com/gravitational/teleport/lib/auth"
 	"github.com/gravitational/teleport/lib/auth/native"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/tlsca"
@@ -43,10 +43,24 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Auth defines interface for creating auth tokens and TLS configurations.
+type Auth interface {
+	// GetRDSAuthToken generates RDS/Aurora auth token.
+	GetRDSAuthToken(sessionCtx *Session) (string, error)
+	// GetRedshiftAuthToken generates Redshift auth token.
+	GetRedshiftAuthToken(sessionCtx *Session) (string, string, error)
+	// GetCloudSQLAuthToken generates Cloud SQL auth token.
+	GetCloudSQLAuthToken(ctx context.Context, sessionCtx *Session) (string, error)
+	// GetTLSConfig builds the client TLS configuration for the session.
+	GetTLSConfig(ctx context.Context, sessionCtx *Session) (*tls.Config, error)
+	// GetAuthPreference returns the cluster authentication config.
+	GetAuthPreference() (services.AuthPreference, error)
+}
+
 // AuthConfig is the database access authenticator configuration.
 type AuthConfig struct {
 	// AuthClient is the cluster auth client.
-	AuthClient *auth.Client
+	AuthClient *libauth.Client
 	// AWSSession is the AWS session for the server's region which is used
 	// to generate RDS/Aurora/Redshift auth tokens. May be empty.
 	AWSSession *awssession.Session
@@ -73,25 +87,25 @@ func (c *AuthConfig) CheckAndSetDefaults() error {
 	return nil
 }
 
-// Auth provides utilities for creating TLS configurations and
+// auth provides utilities for creating TLS configurations and
 // generating auth tokens when connecting to databases.
-type Auth struct {
+type auth struct {
 	cfg AuthConfig
 }
 
 // NewAuth returns a new instance of database access authenticator.
-func NewAuth(config AuthConfig) (*Auth, error) {
+func NewAuth(config AuthConfig) (Auth, error) {
 	if err := config.CheckAndSetDefaults(); err != nil {
 		return nil, trace.Wrap(err)
 	}
-	return &Auth{
+	return &auth{
 		cfg: config,
 	}, nil
 }
 
 // GetRDSAuthToken returns authorization token that will be used as a password
 // when connecting to RDS and Aurora databases.
-func (a *Auth) GetRDSAuthToken(sessionCtx *Session) (string, error) {
+func (a *auth) GetRDSAuthToken(sessionCtx *Session) (string, error) {
 	if a.cfg.AWSSession == nil {
 		return "", trace.BadParameter("AWS session for %s is not initialized", sessionCtx)
 	}
@@ -105,7 +119,7 @@ func (a *Auth) GetRDSAuthToken(sessionCtx *Session) (string, error) {
 
 // GetRedshiftAuthToken returns authorization token that will be used as a
 // password when connecting to Redshift databases.
-func (a *Auth) GetRedshiftAuthToken(sessionCtx *Session) (string, string, error) {
+func (a *auth) GetRedshiftAuthToken(sessionCtx *Session) (string, string, error) {
 	if a.cfg.AWSSession == nil {
 		return "", "", trace.BadParameter("AWS session for %s is not initialized", sessionCtx)
 	}
@@ -129,7 +143,7 @@ func (a *Auth) GetRedshiftAuthToken(sessionCtx *Session) (string, string, error)
 
 // GetCloudSQLAuthToken returns authorization token that will be used as a
 // password when connecting to Cloud SQL databases.
-func (a *Auth) GetCloudSQLAuthToken(ctx context.Context, sessionCtx *Session) (string, error) {
+func (a *auth) GetCloudSQLAuthToken(ctx context.Context, sessionCtx *Session) (string, error) {
 	if a.cfg.GCPIAM == nil {
 		return "", trace.BadParameter("GCP IAM client is not initialized")
 	}
@@ -163,7 +177,7 @@ func (a *Auth) GetCloudSQLAuthToken(ctx context.Context, sessionCtx *Session) (s
 // For RDS/Aurora, the config must contain RDS root certificate as a trusted
 // authority. For onprem we generate a client certificate signed by the host
 // CA used to authenticate.
-func (a *Auth) GetTLSConfig(ctx context.Context, sessionCtx *Session) (*tls.Config, error) {
+func (a *auth) GetTLSConfig(ctx context.Context, sessionCtx *Session) (*tls.Config, error) {
 	addr, err := utils.ParseAddr(sessionCtx.Server.GetURI())
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -230,7 +244,7 @@ func (a *Auth) GetTLSConfig(ctx context.Context, sessionCtx *Session) (*tls.Conf
 
 // getClientCert signs an ephemeral client certificate used by this
 // server to authenticate with the database instance.
-func (a *Auth) getClientCert(ctx context.Context, sessionCtx *Session) (cert *tls.Certificate, cas [][]byte, err error) {
+func (a *auth) getClientCert(ctx context.Context, sessionCtx *Session) (cert *tls.Certificate, cas [][]byte, err error) {
 	privateBytes, _, err := native.GenerateKeyPair("")
 	if err != nil {
 		return nil, nil, trace.Wrap(err)
@@ -260,7 +274,7 @@ func (a *Auth) getClientCert(ctx context.Context, sessionCtx *Session) (cert *tl
 }
 
 // GetAuthPreference returns the cluster authentication config.
-func (a *Auth) GetAuthPreference() (services.AuthPreference, error) {
+func (a *auth) GetAuthPreference() (services.AuthPreference, error) {
 	return a.cfg.AuthClient.GetAuthPreference()
 }
 

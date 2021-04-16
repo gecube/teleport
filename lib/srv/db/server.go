@@ -59,6 +59,8 @@ type Config struct {
 	StreamEmitter events.StreamEmitter
 	// NewAudit allows to override audit logger in tests.
 	NewAudit NewAuditFn
+	// NewAuth allows to override authenticator in tests.
+	NewAuth NewAuthFn
 	// TLSConfig is the *tls.Config for this server.
 	TLSConfig *tls.Config
 	// Authorizer is used to authorize requests coming from proxy.
@@ -71,8 +73,12 @@ type Config struct {
 	OnHeartbeat func(error)
 }
 
-// NewAuditFn defines a function that creates an audit logger.
-type NewAuditFn func(common.AuditConfig) (common.Audit, error)
+type (
+	// NewAuditFn defines a function that creates an audit logger.
+	NewAuditFn func(common.AuditConfig) (common.Audit, error)
+	// NewAuthFn defines a function that creates authenticator.
+	NewAuthFn func(common.AuthConfig) (common.Auth, error)
+)
 
 // CheckAndSetDefaults makes sure the configuration has the minimum required
 // to function.
@@ -94,6 +100,9 @@ func (c *Config) CheckAndSetDefaults(ctx context.Context) error {
 	}
 	if c.NewAudit == nil {
 		c.NewAudit = common.NewAudit
+	}
+	if c.NewAuth == nil {
+		c.NewAuth = common.NewAuth
 	}
 	if c.TLSConfig == nil {
 		return trace.BadParameter("missing TLSConfig")
@@ -393,7 +402,7 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) error {
 
 // dispatch returns an appropriate database engine for the session.
 func (s *Server) dispatch(sessionCtx *common.Session, streamWriter events.StreamWriter) (common.Engine, error) {
-	auth, err := common.NewAuth(common.AuthConfig{
+	auth, err := s.cfg.NewAuth(common.AuthConfig{
 		AuthClient: s.cfg.AuthClient,
 		AWSSession: s.awsSessions[sessionCtx.Server.GetAWS().Region],
 		GCPIAM:     s.gcpIAM,
