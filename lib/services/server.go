@@ -294,10 +294,22 @@ const ServerSpecV2Schema = `{
 			  "public_addr": {"type": "string"},
 			  "insecure_skip_verify": {"type": "boolean"},
 			  "rewrite": {
-			  "type": "object",
-			  "additionalProperties": false,
-			  "properties": {
-				"redirect": {"type": ["array"], "items": {"type": "string"}}
+			    "type": "object",
+			    "additionalProperties": false,
+			    "properties": {
+				  "redirect": {"type": ["array"], "items": {"type": "string"}
+				  "headers": {
+					"type": ["array", "null"],
+					"items": {
+					  "type": "object",
+					  "additionalProperties": false,
+					  "properties": {
+						"name": {"type": "string"},
+						"value": {"type": "string"}
+					  }
+					}
+				  }
+				}
 			  }
 			},
 			"labels": {
@@ -316,7 +328,7 @@ const ServerSpecV2Schema = `{
 				  "additionalProperties": false,
 				  "required": ["command"],
 				  "properties": {
-					  "command": {"type": "array", "items": {"type": "string"}},
+					"command": {"type": "array", "items": {"type": "string"}},
 					"period": {"type": "string"},
 					"result": {"type": "string"}
 				  }
