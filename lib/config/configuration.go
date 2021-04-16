@@ -687,8 +687,17 @@ func applyProxyConfig(fc *FileConfig, cfg *service.Config) error {
 		cfg.Proxy.TunnelPublicAddrs = addrs
 	}
 	if len(fc.Proxy.PostgresPublicAddr) != 0 {
-		// Postgres proxy is multiplexed on the web proxy port.
-		addrs, err := utils.AddrsFromStrings(fc.Proxy.PostgresPublicAddr, defaults.HTTPListenPort)
+		// Postgres proxy is multiplexed on the web proxy port. If the port is
+		// not specified here explicitly, prefer defaults in the following
+		// order, depending on what's set:
+		//   1. Web proxy public port
+		//   2. Web proxy listen port
+		//   3. Web proxy default listen port
+		defaultPort := cfg.Proxy.WebAddr.Port(defaults.HTTPListenPort)
+		if len(cfg.Proxy.PublicAddrs) != 0 {
+			defaultPort = cfg.Proxy.PublicAddrs[0].Port(defaults.HTTPListenPort)
+		}
+		addrs, err := utils.AddrsFromStrings(fc.Proxy.PostgresPublicAddr, defaultPort)
 		if err != nil {
 			return trace.Wrap(err)
 		}

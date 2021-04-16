@@ -368,6 +368,21 @@ func TestApplyProxySettings(t *testing.T) {
 				MySQLProxyAddr:    "mysql.example.com:3306",
 			},
 		},
+		{
+			desc: "Postgres public address port unspecified, defaults to web proxy address port",
+			settingsIn: client.ProxySettings{
+				DB: client.DBProxySettings{
+					PostgresPublicAddr: "postgres.example.com",
+				},
+			},
+			tcConfigIn: Config{
+				WebProxyAddr: "web.example.com:443",
+			},
+			tcConfigOut: Config{
+				WebProxyAddr:      "web.example.com:443",
+				PostgresProxyAddr: "postgres.example.com:443",
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {

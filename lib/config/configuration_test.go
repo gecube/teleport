@@ -21,8 +21,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -583,6 +585,66 @@ func TestApplyConfigNoneEnabled(t *testing.T) {
 	require.False(t, cfg.Databases.Enabled)
 	require.Empty(t, cfg.Proxy.PostgresPublicAddrs)
 	require.Empty(t, cfg.Proxy.MySQLPublicAddrs)
+}
+
+// TestPostgresPublicAddr makes sure Postgres proxy public address default
+// port logic works correctly.
+func TestPostgresPublicAddr(t *testing.T) {
+	tests := []struct {
+		desc string
+		fc   *FileConfig
+		out  []string
+	}{
+		{
+			desc: "postgres public address with port set",
+			fc: &FileConfig{
+				Proxy: Proxy{
+					WebAddr:            "0.0.0.0:8080",
+					PublicAddr:         []string{"web.example.com:443"},
+					PostgresPublicAddr: []string{"postgres.example.com:5432"},
+				},
+			},
+			out: []string{"postgres.example.com:5432"},
+		},
+		{
+			desc: "when port not set, defaults to web proxy public port",
+			fc: &FileConfig{
+				Proxy: Proxy{
+					WebAddr:            "0.0.0.0:8080",
+					PublicAddr:         []string{"web.example.com:443"},
+					PostgresPublicAddr: []string{"postgres.example.com"},
+				},
+			},
+			out: []string{"postgres.example.com:443"},
+		},
+		{
+			desc: "when port and public addr not set, defaults to web proxy listen port",
+			fc: &FileConfig{
+				Proxy: Proxy{
+					WebAddr:            "0.0.0.0:8080",
+					PostgresPublicAddr: []string{"postgres.example.com"},
+				},
+			},
+			out: []string{"postgres.example.com:8080"},
+		},
+		{
+			desc: "when port and listen/public addrs not set, defaults to web proxy default port",
+			fc: &FileConfig{
+				Proxy: Proxy{
+					PostgresPublicAddr: []string{"postgres.example.com"},
+				},
+			},
+			out: []string{net.JoinHostPort("postgres.example.com", strconv.Itoa(defaults.HTTPListenPort))},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			cfg := service.MakeDefaultConfig()
+			err := applyProxyConfig(test.fc, cfg)
+			require.NoError(t, err)
+			require.EqualValues(t, test.out, utils.NetAddrsToStrings(cfg.Proxy.PostgresPublicAddrs))
+		})
+	}
 }
 
 func TestBackendDefaults(t *testing.T) {

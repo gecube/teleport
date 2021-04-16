@@ -2452,7 +2452,7 @@ func (tc *TeleportClient) applyProxySettings(proxySettings client.ProxySettings)
 			return trace.BadParameter("failed to parse Postgres public address received from server: %q, contact your administrator for help",
 				proxySettings.DB.PostgresPublicAddr)
 		}
-		tc.PostgresProxyAddr = net.JoinHostPort(addr.Host(), strconv.Itoa(addr.Port(defaults.HTTPListenPort)))
+		tc.PostgresProxyAddr = net.JoinHostPort(addr.Host(), strconv.Itoa(addr.Port(tc.WebProxyPort())))
 	default:
 		webProxyHost, webProxyPort := tc.WebProxyHostPort()
 		tc.PostgresProxyAddr = net.JoinHostPort(webProxyHost, strconv.Itoa(webProxyPort))
