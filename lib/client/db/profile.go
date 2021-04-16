@@ -61,8 +61,6 @@ func Add(tc *client.TeleportClient, db tlsca.RouteToDatabase, clientProfile clie
 }
 
 func add(tc *client.TeleportClient, db tlsca.RouteToDatabase, clientProfile client.ProfileStatus, profileFile profile.ConnectProfileFile) (*profile.ConnectProfile, error) {
-	// Postgres proxy is normally available on the web proxy port while MySQL
-	// proxy listens on a separate port due to the specifics of the protocol.
 	var host string
 	var port int
 	switch db.Protocol {
@@ -71,7 +69,7 @@ func add(tc *client.TeleportClient, db tlsca.RouteToDatabase, clientProfile clie
 	case defaults.ProtocolMySQL:
 		host, port = tc.MySQLProxyHostPort()
 	default:
-		return nil, trace.BadParameter("unknown database protocol: %v", db)
+		return nil, trace.BadParameter("unknown database protocol: %q", db)
 	}
 	connectProfile := profile.ConnectProfile{
 		Name:       profileName(tc.SiteName, db.ServiceName),

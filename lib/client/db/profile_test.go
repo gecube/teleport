@@ -88,32 +88,34 @@ func TestAddProfile(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		tc := &client.TeleportClient{
-			Config: client.Config{
-				SiteName:          "example.com",
-				WebProxyAddr:      test.webProxyAddrIn,
-				PostgresProxyAddr: test.postgresProxyAddrIn,
-				MySQLProxyAddr:    test.mysqlProxyAddrIn,
-			},
-		}
-		db := tlsca.RouteToDatabase{
-			ServiceName: "example",
-			Protocol:    test.protocolIn,
-		}
-		ps := client.ProfileStatus{
-			Dir:  t.TempDir(),
-			Name: "alice",
-		}
-		actual, err := add(tc, db, ps, &testProfileFile{profiles: make(map[string]profile.ConnectProfile)})
-		require.NoError(t, err)
-		require.EqualValues(t, &profile.ConnectProfile{
-			Name:       profileName(tc.SiteName, db.ServiceName),
-			Host:       test.profileHostOut,
-			Port:       test.profilePortOut,
-			CACertPath: ps.CACertPath(),
-			CertPath:   ps.DatabaseCertPath(db.ServiceName),
-			KeyPath:    ps.KeyPath(),
-		}, actual, test.desc)
+		t.Run(test.desc, func(t *testing.T) {
+			tc := &client.TeleportClient{
+				Config: client.Config{
+					SiteName:          "example.com",
+					WebProxyAddr:      test.webProxyAddrIn,
+					PostgresProxyAddr: test.postgresProxyAddrIn,
+					MySQLProxyAddr:    test.mysqlProxyAddrIn,
+				},
+			}
+			db := tlsca.RouteToDatabase{
+				ServiceName: "example",
+				Protocol:    test.protocolIn,
+			}
+			ps := client.ProfileStatus{
+				Dir:  t.TempDir(),
+				Name: "alice",
+			}
+			actual, err := add(tc, db, ps, &testProfileFile{profiles: make(map[string]profile.ConnectProfile)})
+			require.NoError(t, err)
+			require.EqualValues(t, &profile.ConnectProfile{
+				Name:       profileName(tc.SiteName, db.ServiceName),
+				Host:       test.profileHostOut,
+				Port:       test.profilePortOut,
+				CACertPath: ps.CACertPath(),
+				CertPath:   ps.DatabaseCertPath(db.ServiceName),
+				KeyPath:    ps.KeyPath(),
+			}, actual)
+		})
 	}
 }
 

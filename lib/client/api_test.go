@@ -318,11 +318,13 @@ func TestWebProxyHostPort(t *testing.T) {
 // ping endpoint are correctly applied to Teleport client.
 func TestApplyProxySettings(t *testing.T) {
 	tests := []struct {
+		desc        string
 		settingsIn  client.ProxySettings
 		tcConfigIn  Config
 		tcConfigOut Config
 	}{
 		{
+			desc:       "Postgres public address unspecified, defaults to web proxy address",
 			settingsIn: client.ProxySettings{},
 			tcConfigIn: Config{
 				WebProxyAddr: "web.example.com:443",
@@ -333,6 +335,7 @@ func TestApplyProxySettings(t *testing.T) {
 			},
 		},
 		{
+			desc: "MySQL enabled without public address, defaults to web proxy host and MySQL default port",
 			settingsIn: client.ProxySettings{
 				DB: client.DBProxySettings{
 					MySQLListenAddr: "0.0.0.0:3036",
@@ -348,6 +351,7 @@ func TestApplyProxySettings(t *testing.T) {
 			},
 		},
 		{
+			desc: "both Postgres and MySQL custom public addresses are specified",
 			settingsIn: client.ProxySettings{
 				DB: client.DBProxySettings{
 					PostgresPublicAddr: "postgres.example.com:5432",
@@ -366,9 +370,11 @@ func TestApplyProxySettings(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		tc := &TeleportClient{Config: test.tcConfigIn}
-		err := tc.applyProxySettings(test.settingsIn)
-		require.NoError(t, err)
-		require.EqualValues(t, test.tcConfigOut, tc.Config)
+		t.Run(test.desc, func(t *testing.T) {
+			tc := &TeleportClient{Config: test.tcConfigIn}
+			err := tc.applyProxySettings(test.settingsIn)
+			require.NoError(t, err)
+			require.EqualValues(t, test.tcConfigOut, tc.Config)
+		})
 	}
 }

@@ -246,7 +246,7 @@ func onDatabaseConfig(cf *CLIConf) error {
 	case defaults.ProtocolMySQL:
 		host, port = tc.MySQLProxyHostPort()
 	default:
-		return trace.BadParameter("unknown database protocol: %v", database)
+		return trace.BadParameter("unknown database protocol: %q", database)
 	}
 	fmt.Printf(`Name:      %v
 Host:      %v

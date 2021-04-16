@@ -574,15 +574,15 @@ func TestApplyConfigNoneEnabled(t *testing.T) {
 	require.NoError(t, err)
 
 	require.False(t, cfg.Auth.Enabled)
-	require.Len(t, cfg.Auth.PublicAddrs, 0)
+	require.Empty(t, cfg.Auth.PublicAddrs)
 	require.False(t, cfg.Proxy.Enabled)
-	require.Len(t, cfg.Proxy.PublicAddrs, 0)
+	require.Empty(t, cfg.Proxy.PublicAddrs)
 	require.False(t, cfg.SSH.Enabled)
-	require.Len(t, cfg.SSH.PublicAddrs, 0)
+	require.Empty(t, cfg.SSH.PublicAddrs)
 	require.False(t, cfg.Apps.Enabled)
 	require.False(t, cfg.Databases.Enabled)
-	require.Len(t, cfg.Proxy.PostgresPublicAddrs, 0)
-	require.Len(t, cfg.Proxy.MySQLPublicAddrs, 0)
+	require.Empty(t, cfg.Proxy.PostgresPublicAddrs)
+	require.Empty(t, cfg.Proxy.MySQLPublicAddrs)
 }
 
 func TestBackendDefaults(t *testing.T) {
