@@ -201,6 +201,13 @@ var (
 			Buckets: prometheus.ExponentialBuckets(0.001, 2, 16),
 		},
 	)
+	// UserLoginCount keeps track of user logins
+	UserLoginCount = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: teleport.MetricUserLoginCount,
+			Help: "Number of times there was a user login",
+		},
+	)
 )
 
 // Server keeps the cluster together. It acts as a certificate authority (CA) for
@@ -1610,6 +1617,7 @@ func (a *Server) NewWebSession(req types.NewWebSessionRequest) (services.WebSess
 		return nil, trace.Wrap(err)
 	}
 	bearerTokenTTL := utils.MinTTL(sessionTTL, BearerTokenTTL)
+	UserLoginCount.Inc()
 	return services.NewWebSession(token, services.KindWebSession, services.KindWebSession, services.WebSessionSpecV2{
 		User:               req.User,
 		Priv:               priv,
@@ -2492,4 +2500,5 @@ func init() {
 	prometheus.MustRegister(generateThrottledRequestsCount)
 	prometheus.MustRegister(generateRequestsCurrent)
 	prometheus.MustRegister(generateRequestsLatencies)
+	prometheus.MustRegister(UserLoginCount)
 }

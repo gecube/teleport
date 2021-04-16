@@ -55,8 +55,14 @@ const (
 	// MetricUserMaxConcurrentSessionsHit counts number of times the user exceeded their max concurrent ssh connections
 	MetricUserMaxConcurrentSessionsHit = "user_max_concurrent_sessions_hit_total"
 
-	// MetricProxyConnectionLimitHitCount counts the number of times proxy connection limit was exceeded
-	MetricProxyConnectionLimitHitCount = "proxy_connection_limit_exceeded_total"
+	// MetricProxyConnectionLimitHit counts the number of times proxy connection limit was exceeded
+	MetricProxyConnectionLimitHit = "proxy_connection_limit_exceeded_total"
+
+	// MetricUserLoginCount counts user logins
+	MetricUserLoginCount = "user_login_count"
+
+	// MetricHeartbeatConnectionsReceived counts heartbeat connections received by auth
+	MetricHeartbeatConnectionsReceived = "heartbeat_connections_received_total"
 
 	// TagCluster is a metric tag for a cluster
 	TagCluster = "cluster"

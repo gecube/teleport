@@ -40,6 +40,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/gravitational/trace"
 	"github.com/gravitational/trace/trail"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -65,6 +66,19 @@ func (g *GRPCServer) GetServer() (*grpc.Server, error) {
 	}
 
 	return g.server, nil
+}
+
+var (
+	heartbeatConnectionsReceived = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: teleport.MetricHeartbeatConnectionsReceived,
+			Help: "Number of auth received a heartbeat",
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(heartbeatConnectionsReceived)
 }
 
 // EmitAuditEvent emits audit event
@@ -102,6 +116,7 @@ func (g *GRPCServer) SendKeepAlives(stream proto.AuthService_SendKeepAlivesServe
 			g.Debugf("Failed to receive heartbeat: %v", err)
 			return trail.ToGRPC(err)
 		}
+		heartbeatConnectionsReceived.Inc()
 		err = auth.KeepAliveServer(stream.Context(), *keepAlive)
 		if err != nil {
 			return trail.ToGRPC(err)

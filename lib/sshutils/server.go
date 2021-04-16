@@ -395,7 +395,7 @@ func (s *Server) trackConnections(delta int32) int32 {
 var (
 	proxyConnectionLimitHitCount = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: teleport.MetricProxyConnectionLimitHitCount,
+			Name: teleport.MetricProxyConnectionLimitHit,
 			Help: "Number of times proxy connection limit was exceeded",
 		},
 	)

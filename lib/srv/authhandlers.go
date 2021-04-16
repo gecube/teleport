@@ -198,6 +198,7 @@ func (h *AuthHandlers) UserKeyAuth(conn ssh.ConnMetadata, key ssh.PublicKey) (*s
 
 	// only failed attempts are logged right now
 	recordFailedLogin := func(err error) {
+		failedLoginCount.Inc()
 		if err := h.Emitter.EmitAuditEvent(h.Server.Context(), &events.AuthAttempt{
 			Metadata: events.Metadata{
 				Type: events.AuthAttemptEvent,
@@ -218,7 +219,6 @@ func (h *AuthHandlers) UserKeyAuth(conn ssh.ConnMetadata, key ssh.PublicKey) (*s
 		}); err != nil {
 			h.WithError(err).Warn("Failed to emit failed login audit event.")
 		}
-		failedLoginCount.Inc()
 	}
 
 	// Check that the user certificate uses supported public key algorithms, was
